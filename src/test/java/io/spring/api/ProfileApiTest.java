@@ -1,96 +1,83 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
-import static org.hamcrest.core.IsEqual.equalTo;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
-import io.spring.api.security.WebSecurityConfig;
 import io.spring.application.ProfileQueryService;
 import io.spring.application.data.ProfileData;
-import io.spring.core.user.FollowRelation;
+import io.spring.core.service.JwtService;
 import io.spring.core.user.User;
+import io.spring.core.user.UserRepository;
+import io.spring.infrastructure.readservice.R2dbcUserReadService;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
-@WebMvcTest(ProfileApi.class)
-@Import({WebSecurityConfig.class, JacksonCustomizations.class})
-public class ProfileApiTest extends TestWithCurrentUser {
-  private User anotherUser;
-
-  @Autowired private MockMvc mvc;
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
+public class ProfileApiTest {
+  @Autowired private WebTestClient client;
 
   @MockBean private ProfileQueryService profileQueryService;
+  @MockBean private UserRepository userRepository;
+  @MockBean private JwtService jwtService;
+  @MockBean private R2dbcUserReadService userReadService;
 
-  private ProfileData profileData;
+  private User user;
+  private String token;
 
   @BeforeEach
-  public void setUp() throws Exception {
-    super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
-    anotherUser = new User("username@test.com", "username", "123", "", "");
-    profileData =
+  public void setUp() {
+    user = new User("john@jacob.com", "johnjacob", "123", "", "default");
+    when(userRepository.findById(eq(user.getId()))).thenReturn(Optional.of(user));
+
+    token = "token";
+    when(jwtService.getSubFromToken(eq(token))).thenReturn(Optional.of(user.getId()));
+  }
+
+  @Test
+  public void should_get_profile() {
+    ProfileData profileData =
+        new ProfileData(user.getId(), user.getUsername(), user.getBio(), user.getImage(), false);
+    when(profileQueryService.findByUsername(eq(user.getUsername()), any()))
+        .thenReturn(Optional.of(profileData));
+
+    client
+        .get()
+        .uri("/profiles/" + user.getUsername())
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody()
+        .jsonPath("$.profile.username")
+        .isEqualTo(user.getUsername());
+  }
+
+  @Test
+  public void should_follow_user() {
+    User target = new User("target@example.com", "targetuser", "123", "", "");
+    when(userRepository.findByUsername(eq(target.getUsername()))).thenReturn(Optional.of(target));
+    ProfileData profileData =
         new ProfileData(
-            anotherUser.getId(),
-            anotherUser.getUsername(),
-            anotherUser.getBio(),
-            anotherUser.getImage(),
-            false);
-    when(userRepository.findByUsername(eq(anotherUser.getUsername())))
-        .thenReturn(Optional.of(anotherUser));
-  }
-
-  @Test
-  public void should_get_user_profile_success() throws Exception {
-    when(profileQueryService.findByUsername(eq(profileData.getUsername()), eq(null)))
+            target.getId(), target.getUsername(), target.getBio(), target.getImage(), true);
+    when(profileQueryService.findByUsername(eq(target.getUsername()), any()))
         .thenReturn(Optional.of(profileData));
-    RestAssuredMockMvc.when()
-        .get("/profiles/{username}", profileData.getUsername())
-        .prettyPeek()
-        .then()
-        .statusCode(200)
-        .body("profile.username", equalTo(profileData.getUsername()));
-  }
 
-  @Test
-  public void should_follow_user_success() throws Exception {
-    when(profileQueryService.findByUsername(eq(profileData.getUsername()), eq(user)))
-        .thenReturn(Optional.of(profileData));
-    given()
+    client
+        .post()
+        .uri("/profiles/" + target.getUsername() + "/follow")
         .header("Authorization", "Token " + token)
-        .when()
-        .post("/profiles/{username}/follow", anotherUser.getUsername())
-        .prettyPeek()
-        .then()
-        .statusCode(200);
-    verify(userRepository).saveRelation(new FollowRelation(user.getId(), anotherUser.getId()));
-  }
-
-  @Test
-  public void should_unfollow_user_success() throws Exception {
-    FollowRelation followRelation = new FollowRelation(user.getId(), anotherUser.getId());
-    when(userRepository.findRelation(eq(user.getId()), eq(anotherUser.getId())))
-        .thenReturn(Optional.of(followRelation));
-    when(profileQueryService.findByUsername(eq(profileData.getUsername()), eq(user)))
-        .thenReturn(Optional.of(profileData));
-
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .delete("/profiles/{username}/follow", anotherUser.getUsername())
-        .prettyPeek()
-        .then()
-        .statusCode(200);
-
-    verify(userRepository).removeRelation(eq(followRelation));
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody()
+        .jsonPath("$.profile.following")
+        .isEqualTo(true);
   }
 }

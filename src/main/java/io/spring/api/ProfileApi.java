@@ -6,7 +6,7 @@ import io.spring.application.data.ProfileData;
 import io.spring.core.user.FollowRelation;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping(path = "profiles/{username}")
@@ -26,53 +27,58 @@ public class ProfileApi {
   private UserRepository userRepository;
 
   @GetMapping
-  public ResponseEntity getProfile(
+  public Mono<ResponseEntity<?>> getProfile(
       @PathVariable("username") String username, @AuthenticationPrincipal User user) {
-    return profileQueryService
-        .findByUsername(username, user)
-        .map(this::profileResponse)
-        .orElseThrow(ResourceNotFoundException::new);
+    return Mono.fromCallable(
+        () ->
+            profileQueryService
+                .findByUsername(username, user)
+                .map(this::profileResponse)
+                .orElseThrow(ResourceNotFoundException::new));
   }
 
   @PostMapping(path = "follow")
-  public ResponseEntity follow(
+  public Mono<ResponseEntity<?>> follow(
       @PathVariable("username") String username, @AuthenticationPrincipal User user) {
-    return userRepository
-        .findByUsername(username)
-        .map(
-            target -> {
-              FollowRelation followRelation = new FollowRelation(user.getId(), target.getId());
-              userRepository.saveRelation(followRelation);
-              return profileResponse(profileQueryService.findByUsername(username, user).get());
-            })
-        .orElseThrow(ResourceNotFoundException::new);
+    return Mono.fromCallable(
+        () ->
+            userRepository
+                .findByUsername(username)
+                .map(
+                    target -> {
+                      FollowRelation followRelation =
+                          new FollowRelation(user.getId(), target.getId());
+                      userRepository.saveRelation(followRelation);
+                      return profileResponse(
+                          profileQueryService.findByUsername(username, user).get());
+                    })
+                .orElseThrow(ResourceNotFoundException::new));
   }
 
   @DeleteMapping(path = "follow")
-  public ResponseEntity unfollow(
+  public Mono<ResponseEntity<?>> unfollow(
       @PathVariable("username") String username, @AuthenticationPrincipal User user) {
-    Optional<User> userOptional = userRepository.findByUsername(username);
-    if (userOptional.isPresent()) {
-      User target = userOptional.get();
-      return userRepository
-          .findRelation(user.getId(), target.getId())
-          .map(
-              relation -> {
-                userRepository.removeRelation(relation);
-                return profileResponse(profileQueryService.findByUsername(username, user).get());
-              })
-          .orElseThrow(ResourceNotFoundException::new);
-    } else {
-      throw new ResourceNotFoundException();
-    }
-  }
-
-  private ResponseEntity profileResponse(ProfileData profile) {
-    return ResponseEntity.ok(
-        new HashMap<String, Object>() {
-          {
-            put("profile", profile);
+    return Mono.fromCallable(
+        () -> {
+          Optional<User> userOptional = userRepository.findByUsername(username);
+          if (userOptional.isPresent()) {
+            User target = userOptional.get();
+            return userRepository
+                .findRelation(user.getId(), target.getId())
+                .map(
+                    relation -> {
+                      userRepository.removeRelation(relation);
+                      return profileResponse(
+                          profileQueryService.findByUsername(username, user).get());
+                    })
+                .orElseThrow(ResourceNotFoundException::new);
+          } else {
+            throw new ResourceNotFoundException();
           }
         });
+  }
+
+  private ResponseEntity<?> profileResponse(ProfileData profile) {
+    return ResponseEntity.ok(Map.of("profile", profile));
   }
 }

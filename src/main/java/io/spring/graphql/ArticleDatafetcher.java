@@ -6,8 +6,6 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import graphql.execution.DataFetcherResult;
-import graphql.relay.DefaultConnectionCursor;
-import graphql.relay.DefaultPageInfo;
 import graphql.schema.DataFetchingEnvironment;
 import io.spring.api.exception.ResourceNotFoundException;
 import io.spring.application.ArticleQueryService;
@@ -26,11 +24,12 @@ import io.spring.graphql.DgsConstants.QUERY;
 import io.spring.graphql.types.Article;
 import io.spring.graphql.types.ArticleEdge;
 import io.spring.graphql.types.ArticlesConnection;
+import io.spring.graphql.types.PageInfo;
 import io.spring.graphql.types.Profile;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
-import org.joda.time.format.ISODateTimeFormat;
 
 @DgsComponent
 @AllArgsConstructor
@@ -47,7 +46,7 @@ public class ArticleDatafetcher {
       @InputArgument("before") String before,
       DgsDataFetchingEnvironment dfe) {
     if (first == null && last == null) {
-      throw new IllegalArgumentException("first 和 last 必须只存在一个");
+      throw new IllegalArgumentException("first and last must have one present");
     }
 
     User current = SecurityUtil.getCurrentUser().orElse(null);
@@ -64,7 +63,7 @@ public class ArticleDatafetcher {
               current,
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    PageInfo pageInfo = buildArticlePageInfo(articles);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -93,7 +92,7 @@ public class ArticleDatafetcher {
       @InputArgument("before") String before,
       DgsDataFetchingEnvironment dfe) {
     if (first == null && last == null) {
-      throw new IllegalArgumentException("first 和 last 必须只存在一个");
+      throw new IllegalArgumentException("first and last must have one present");
     }
 
     Profile profile = dfe.getSource();
@@ -114,7 +113,7 @@ public class ArticleDatafetcher {
               target,
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    PageInfo pageInfo = buildArticlePageInfo(articles);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -143,7 +142,7 @@ public class ArticleDatafetcher {
       @InputArgument("before") String before,
       DgsDataFetchingEnvironment dfe) {
     if (first == null && last == null) {
-      throw new IllegalArgumentException("first 和 last 必须只存在一个");
+      throw new IllegalArgumentException("first and last must have one present");
     }
 
     User current = SecurityUtil.getCurrentUser().orElse(null);
@@ -156,18 +155,18 @@ public class ArticleDatafetcher {
               null,
               null,
               profile.getUsername(),
-              new CursorPageParameter<>(DateTimeCursor.parse(after), first, Direction.NEXT),
-              current);
+              current,
+              new CursorPageParameter<>(DateTimeCursor.parse(after), first, Direction.NEXT));
     } else {
       articles =
           articleQueryService.findRecentArticlesWithCursor(
               null,
               null,
               profile.getUsername(),
-              new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV),
-              current);
+              current,
+              new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    PageInfo pageInfo = buildArticlePageInfo(articles);
 
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
@@ -197,7 +196,7 @@ public class ArticleDatafetcher {
       @InputArgument("before") String before,
       DgsDataFetchingEnvironment dfe) {
     if (first == null && last == null) {
-      throw new IllegalArgumentException("first 和 last 必须只存在一个");
+      throw new IllegalArgumentException("first and last must have one present");
     }
 
     User current = SecurityUtil.getCurrentUser().orElse(null);
@@ -210,18 +209,18 @@ public class ArticleDatafetcher {
               null,
               profile.getUsername(),
               null,
-              new CursorPageParameter<>(DateTimeCursor.parse(after), first, Direction.NEXT),
-              current);
+              current,
+              new CursorPageParameter<>(DateTimeCursor.parse(after), first, Direction.NEXT));
     } else {
       articles =
           articleQueryService.findRecentArticlesWithCursor(
               null,
               profile.getUsername(),
               null,
-              new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV),
-              current);
+              current,
+              new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    PageInfo pageInfo = buildArticlePageInfo(articles);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -253,7 +252,7 @@ public class ArticleDatafetcher {
       @InputArgument("withTag") String withTag,
       DgsDataFetchingEnvironment dfe) {
     if (first == null && last == null) {
-      throw new IllegalArgumentException("first 和 last 必须只存在一个");
+      throw new IllegalArgumentException("first and last must have one present");
     }
 
     User current = SecurityUtil.getCurrentUser().orElse(null);
@@ -265,18 +264,18 @@ public class ArticleDatafetcher {
               withTag,
               authoredBy,
               favoritedBy,
-              new CursorPageParameter<>(DateTimeCursor.parse(after), first, Direction.NEXT),
-              current);
+              current,
+              new CursorPageParameter<>(DateTimeCursor.parse(after), first, Direction.NEXT));
     } else {
       articles =
           articleQueryService.findRecentArticlesWithCursor(
               withTag,
               authoredBy,
               favoritedBy,
-              new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV),
-              current);
+              current,
+              new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    PageInfo pageInfo = buildArticlePageInfo(articles);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -356,29 +355,27 @@ public class ArticleDatafetcher {
         .build();
   }
 
-  private DefaultPageInfo buildArticlePageInfo(CursorPager<ArticleData> articles) {
-    return new DefaultPageInfo(
-        articles.getStartCursor() == null
-            ? null
-            : new DefaultConnectionCursor(articles.getStartCursor().toString()),
-        articles.getEndCursor() == null
-            ? null
-            : new DefaultConnectionCursor(articles.getEndCursor().toString()),
-        articles.hasPrevious(),
-        articles.hasNext());
+  private PageInfo buildArticlePageInfo(CursorPager<ArticleData> articles) {
+    return PageInfo.newBuilder()
+        .startCursor(
+            articles.getStartCursor() == null ? null : articles.getStartCursor().toString())
+        .endCursor(articles.getEndCursor() == null ? null : articles.getEndCursor().toString())
+        .hasPreviousPage(articles.hasPrevious())
+        .hasNextPage(articles.hasNext())
+        .build();
   }
 
   private Article buildArticleResult(ArticleData articleData) {
     return Article.newBuilder()
         .body(articleData.getBody())
-        .createdAt(ISODateTimeFormat.dateTime().withZoneUTC().print(articleData.getCreatedAt()))
+        .createdAt(articleData.getCreatedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
         .description(articleData.getDescription())
         .favorited(articleData.isFavorited())
         .favoritesCount(articleData.getFavoritesCount())
         .slug(articleData.getSlug())
         .tagList(articleData.getTagList())
         .title(articleData.getTitle())
-        .updatedAt(ISODateTimeFormat.dateTime().withZoneUTC().print(articleData.getUpdatedAt()))
+        .updatedAt(articleData.getUpdatedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
         .build();
   }
 }

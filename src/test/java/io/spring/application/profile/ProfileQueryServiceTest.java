@@ -1,30 +1,37 @@
 package io.spring.application.profile;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
 import io.spring.application.ProfileQueryService;
 import io.spring.application.data.ProfileData;
-import io.spring.core.user.User;
-import io.spring.core.user.UserRepository;
-import io.spring.infrastructure.DbTestBase;
-import io.spring.infrastructure.repository.MyBatisUserRepository;
+import io.spring.application.data.UserData;
+import io.spring.infrastructure.readservice.R2dbcUserReadService;
+import io.spring.infrastructure.readservice.R2dbcUserRelationshipQueryService;
 import java.util.Optional;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@Import({ProfileQueryService.class, MyBatisUserRepository.class})
-public class ProfileQueryServiceTest extends DbTestBase {
-  @Autowired private ProfileQueryService profileQueryService;
-  @Autowired private UserRepository userRepository;
+@ExtendWith(MockitoExtension.class)
+public class ProfileQueryServiceTest {
+
+  @Mock private R2dbcUserReadService userReadService;
+  @Mock private R2dbcUserRelationshipQueryService userRelationshipQueryService;
+
+  @InjectMocks private ProfileQueryService profileQueryService;
 
   @Test
-  public void should_fetch_profile_success() {
-    User currentUser = new User("a@test.com", "a", "123", "", "");
-    User profileUser = new User("p@test.com", "p", "123", "", "");
-    userRepository.save(profileUser);
+  public void should_find_profile_by_username() {
+    UserData userData = new UserData("userId", "email@test.com", "testuser", "bio", "image");
+    when(userReadService.findByUsername(eq("testuser"))).thenReturn(userData);
 
-    Optional<ProfileData> optional =
-        profileQueryService.findByUsername(profileUser.getUsername(), currentUser);
-    Assertions.assertTrue(optional.isPresent());
+    Optional<ProfileData> result = profileQueryService.findByUsername("testuser", null);
+    assertTrue(result.isPresent());
+    assertEquals("testuser", result.get().getUsername());
   }
 }

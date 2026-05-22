@@ -7,7 +7,7 @@ import io.spring.application.data.UserData;
 import io.spring.core.service.JwtService;
 import io.spring.core.user.User;
 import io.spring.core.user.UserRepository;
-import io.spring.infrastructure.mybatis.readservice.UserReadService;
+import io.spring.infrastructure.readservice.R2dbcUserReadService;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -15,7 +15,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 abstract class TestWithCurrentUser {
   @MockBean protected UserRepository userRepository;
 
-  @MockBean protected UserReadService userReadService;
+  @MockBean protected R2dbcUserReadService userReadService;
 
   protected User user;
   protected UserData userData;

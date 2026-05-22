@@ -2,15 +2,15 @@ package io.spring;
 
 import io.spring.application.data.ArticleData;
 import io.spring.application.data.ProfileData;
-import io.spring.core.article.Article;
 import io.spring.core.user.User;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
-import org.joda.time.DateTime;
 
 public class TestHelper {
   public static ArticleData articleDataFixture(String seed, User user) {
-    DateTime now = new DateTime();
+    OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
     return new ArticleData(
         seed + "id",
         "title-" + seed,
@@ -25,7 +25,8 @@ public class TestHelper {
         new ProfileData(user.getId(), user.getUsername(), user.getBio(), user.getImage(), false));
   }
 
-  public static ArticleData getArticleDataFromArticleAndUser(Article article, User user) {
+  public static ArticleData getArticleDataFromArticleAndUser(
+      io.spring.core.article.Article article, User user) {
     return new ArticleData(
         article.getId(),
         article.getSlug(),
@@ -36,7 +37,7 @@ public class TestHelper {
         0,
         article.getCreatedAt(),
         article.getUpdatedAt(),
-        Arrays.asList("joda"),
+        Arrays.asList("java"),
         new ProfileData(user.getId(), user.getUsername(), user.getBio(), user.getImage(), false));
   }
 }

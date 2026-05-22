@@ -17,12 +17,9 @@ import io.spring.graphql.types.CreateUserInput;
 import io.spring.graphql.types.UpdateUserInput;
 import io.spring.graphql.types.UserPayload;
 import io.spring.graphql.types.UserResult;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Optional;
-import javax.validation.ConstraintViolationException;
 import lombok.AllArgsConstructor;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @DgsComponent
@@ -69,12 +66,10 @@ public class UserMutation {
   @DgsData(parentType = MUTATION.TYPE_NAME, field = MUTATION.UpdateUser)
   public DataFetcherResult<UserPayload> updateUser(
       @InputArgument("changes") UpdateUserInput updateUserInput) {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication instanceof AnonymousAuthenticationToken
-        || authentication.getPrincipal() == null) {
+    User currentUser = SecurityUtil.getCurrentUser().orElse(null);
+    if (currentUser == null) {
       return null;
     }
-    io.spring.core.user.User currentUser = (io.spring.core.user.User) authentication.getPrincipal();
     UpdateUserParam param =
         UpdateUserParam.builder()
             .username(updateUserInput.getUsername())

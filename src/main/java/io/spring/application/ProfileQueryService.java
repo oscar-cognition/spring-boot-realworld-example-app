@@ -3,8 +3,8 @@ package io.spring.application;
 import io.spring.application.data.ProfileData;
 import io.spring.application.data.UserData;
 import io.spring.core.user.User;
-import io.spring.infrastructure.mybatis.readservice.UserReadService;
-import io.spring.infrastructure.mybatis.readservice.UserRelationshipQueryService;
+import io.spring.infrastructure.readservice.R2dbcUserReadService;
+import io.spring.infrastructure.readservice.R2dbcUserRelationshipQueryService;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
 @Component
 @AllArgsConstructor
 public class ProfileQueryService {
-  private UserReadService userReadService;
-  private UserRelationshipQueryService userRelationshipQueryService;
+  private R2dbcUserReadService userReadService;
+  private R2dbcUserRelationshipQueryService userRelationshipQueryService;
 
   public Optional<ProfileData> findByUsername(String username, User currentUser) {
     UserData userData = userReadService.findByUsername(username);

@@ -7,9 +7,8 @@ import io.spring.application.user.UpdateUserCommand;
 import io.spring.application.user.UpdateUserParam;
 import io.spring.application.user.UserService;
 import io.spring.core.user.User;
-import java.util.HashMap;
+import jakarta.validation.Valid;
 import java.util.Map;
-import javax.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping(path = "/user")
@@ -29,30 +29,31 @@ public class CurrentUserApi {
   private UserService userService;
 
   @GetMapping
-  public ResponseEntity currentUser(
+  public Mono<ResponseEntity<?>> currentUser(
       @AuthenticationPrincipal User currentUser,
       @RequestHeader(value = "Authorization") String authorization) {
-    UserData userData = userQueryService.findById(currentUser.getId()).get();
-    return ResponseEntity.ok(
-        userResponse(new UserWithToken(userData, authorization.split(" ")[1])));
+    return Mono.fromCallable(
+        () -> {
+          UserData userData = userQueryService.findById(currentUser.getId()).get();
+          return ResponseEntity.ok(
+              userResponse(new UserWithToken(userData, authorization.split(" ")[1])));
+        });
   }
 
   @PutMapping
-  public ResponseEntity updateProfile(
+  public Mono<ResponseEntity<?>> updateProfile(
       @AuthenticationPrincipal User currentUser,
       @RequestHeader("Authorization") String token,
       @Valid @RequestBody UpdateUserParam updateUserParam) {
-
-    userService.updateUser(new UpdateUserCommand(currentUser, updateUserParam));
-    UserData userData = userQueryService.findById(currentUser.getId()).get();
-    return ResponseEntity.ok(userResponse(new UserWithToken(userData, token.split(" ")[1])));
+    return Mono.fromCallable(
+        () -> {
+          userService.updateUser(new UpdateUserCommand(currentUser, updateUserParam));
+          UserData userData = userQueryService.findById(currentUser.getId()).get();
+          return ResponseEntity.ok(userResponse(new UserWithToken(userData, token.split(" ")[1])));
+        });
   }
 
   private Map<String, Object> userResponse(UserWithToken userWithToken) {
-    return new HashMap<String, Object>() {
-      {
-        put("user", userWithToken);
-      }
-    };
+    return Map.of("user", userWithToken);
   }
 }

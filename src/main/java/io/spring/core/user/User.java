@@ -5,12 +5,16 @@ import java.util.UUID;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
 
 @Getter
 @NoArgsConstructor
 @EqualsAndHashCode(of = {"id"})
+@Table("users")
 public class User {
-  private String id;
+  @Id @Setter private String id;
   private String email;
   private String username;
   private String password;

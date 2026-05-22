@@ -1,75 +1,69 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
-import static io.spring.TestHelper.articleDataFixture;
-import static java.util.Arrays.asList;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
-import io.spring.api.security.WebSecurityConfig;
+import io.spring.TestHelper;
 import io.spring.application.ArticleQueryService;
-import io.spring.application.Page;
-import io.spring.application.article.ArticleCommandService;
+import io.spring.application.data.ArticleData;
 import io.spring.application.data.ArticleDataList;
-import io.spring.core.article.ArticleRepository;
-import org.junit.jupiter.api.BeforeEach;
+import io.spring.core.service.JwtService;
+import io.spring.core.user.User;
+import io.spring.core.user.UserRepository;
+import io.spring.infrastructure.readservice.R2dbcUserReadService;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
-@WebMvcTest(ArticlesApi.class)
-@Import({WebSecurityConfig.class, JacksonCustomizations.class})
-public class ListArticleApiTest extends TestWithCurrentUser {
-  @MockBean private ArticleRepository articleRepository;
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
+public class ListArticleApiTest {
+  @Autowired private WebTestClient client;
 
   @MockBean private ArticleQueryService articleQueryService;
+  @MockBean private UserRepository userRepository;
+  @MockBean private JwtService jwtService;
+  @MockBean private R2dbcUserReadService userReadService;
 
-  @MockBean private ArticleCommandService articleCommandService;
+  @Test
+  public void should_list_articles_with_default_params() {
+    User user = new User("john@jacob.com", "johnjacob", "123", "", "default");
+    ArticleData articleData = TestHelper.articleDataFixture("1", user);
+    ArticleDataList list = new ArticleDataList(List.of(articleData), 1);
+    when(articleQueryService.findRecentArticles(any(), any(), any(), any(), any()))
+        .thenReturn(list);
 
-  @Autowired private MockMvc mvc;
-
-  @Override
-  @BeforeEach
-  public void setUp() throws Exception {
-    super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
+    client
+        .get()
+        .uri("/articles")
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody()
+        .jsonPath("$.articlesCount")
+        .isEqualTo(1);
   }
 
   @Test
-  public void should_get_default_article_list() throws Exception {
-    ArticleDataList articleDataList =
-        new ArticleDataList(
-            asList(articleDataFixture("1", user), articleDataFixture("2", user)), 2);
-    when(articleQueryService.findRecentArticles(
-            eq(null), eq(null), eq(null), eq(new Page(0, 20)), eq(null)))
-        .thenReturn(articleDataList);
-    RestAssuredMockMvc.when().get("/articles").prettyPeek().then().statusCode(200);
-  }
+  public void should_list_articles_by_tag() {
+    User user = new User("john@jacob.com", "johnjacob", "123", "", "default");
+    ArticleData articleData = TestHelper.articleDataFixture("1", user);
+    ArticleDataList list = new ArticleDataList(List.of(articleData), 1);
+    when(articleQueryService.findRecentArticles(any(), any(), any(), any(), any()))
+        .thenReturn(list);
 
-  @Test
-  public void should_get_feeds_401_without_login() throws Exception {
-    RestAssuredMockMvc.when().get("/articles/feed").prettyPeek().then().statusCode(401);
-  }
-
-  @Test
-  public void should_get_feeds_success() throws Exception {
-    ArticleDataList articleDataList =
-        new ArticleDataList(
-            asList(articleDataFixture("1", user), articleDataFixture("2", user)), 2);
-    when(articleQueryService.findUserFeed(eq(user), eq(new Page(0, 20))))
-        .thenReturn(articleDataList);
-
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .get("/articles/feed")
-        .prettyPeek()
-        .then()
-        .statusCode(200);
+    client
+        .get()
+        .uri("/articles?tag=java")
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody()
+        .jsonPath("$.articlesCount")
+        .isEqualTo(1);
   }
 }

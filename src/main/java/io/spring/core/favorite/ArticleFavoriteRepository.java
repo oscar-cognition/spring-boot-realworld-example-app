@@ -8,4 +8,8 @@ public interface ArticleFavoriteRepository {
   Optional<ArticleFavorite> find(String articleId, String userId);
 
   void remove(ArticleFavorite favorite);
+
+  int count(String articleId);
+
+  boolean isUserFavorite(String userId, String articleId);
 }
