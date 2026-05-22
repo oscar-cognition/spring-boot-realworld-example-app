@@ -2,8 +2,8 @@ package io.spring.application;
 
 import io.spring.application.data.CommentData;
 import io.spring.core.user.User;
-import io.spring.infrastructure.mybatis.readservice.CommentReadService;
-import io.spring.infrastructure.mybatis.readservice.UserRelationshipQueryService;
+import io.spring.infrastructure.readservice.R2dbcCommentReadService;
+import io.spring.infrastructure.readservice.R2dbcUserRelationshipQueryService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,19 +17,21 @@ import org.springframework.stereotype.Service;
 @Service
 @AllArgsConstructor
 public class CommentQueryService {
-  private CommentReadService commentReadService;
-  private UserRelationshipQueryService userRelationshipQueryService;
+  private R2dbcCommentReadService commentReadService;
+  private R2dbcUserRelationshipQueryService userRelationshipQueryService;
 
   public Optional<CommentData> findById(String id, User user) {
     CommentData commentData = commentReadService.findById(id);
     if (commentData == null) {
       return Optional.empty();
     } else {
-      commentData
-          .getProfileData()
-          .setFollowing(
-              userRelationshipQueryService.isUserFollowing(
-                  user.getId(), commentData.getProfileData().getId()));
+      if (user != null) {
+        commentData
+            .getProfileData()
+            .setFollowing(
+                userRelationshipQueryService.isUserFollowing(
+                    user.getId(), commentData.getProfileData().getId()));
+      }
     }
     return Optional.ofNullable(commentData);
   }

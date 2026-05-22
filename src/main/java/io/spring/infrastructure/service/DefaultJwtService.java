@@ -3,26 +3,24 @@ package io.spring.infrastructure.service;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import io.spring.core.service.JwtService;
 import io.spring.core.user.User;
 import java.util.Date;
 import java.util.Optional;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
-@Component
+@Service
 public class DefaultJwtService implements JwtService {
   private final SecretKey signingKey;
-  private int sessionTime;
+  private final int sessionTime;
 
-  @Autowired
   public DefaultJwtService(
       @Value("${jwt.secret}") String secret, @Value("${jwt.sessionTime}") int sessionTime) {
+    this.signingKey = Keys.hmacShaKeyFor(secret.getBytes());
     this.sessionTime = sessionTime;
-    this.signingKey = new SecretKeySpec(secret.getBytes(), "HmacSHA512");
   }
 
   @Override

@@ -2,7 +2,6 @@ package io.spring;
 
 import io.spring.application.data.ArticleData;
 import io.spring.application.data.ProfileData;
-import io.spring.core.article.Article;
 import io.spring.core.user.User;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -26,7 +25,8 @@ public class TestHelper {
         new ProfileData(user.getId(), user.getUsername(), user.getBio(), user.getImage(), false));
   }
 
-  public static ArticleData getArticleDataFromArticleAndUser(Article article, User user) {
+  public static ArticleData getArticleDataFromArticleAndUser(
+      io.spring.core.article.Article article, User user) {
     return new ArticleData(
         article.getId(),
         article.getSlug(),
@@ -37,7 +37,7 @@ public class TestHelper {
         0,
         article.getCreatedAt(),
         article.getUpdatedAt(),
-        Arrays.asList("joda"),
+        Arrays.asList("java"),
         new ProfileData(user.getId(), user.getUsername(), user.getBio(), user.getImage(), false));
   }
 }

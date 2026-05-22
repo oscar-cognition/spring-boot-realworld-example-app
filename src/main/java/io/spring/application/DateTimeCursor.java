@@ -16,9 +16,9 @@ public class DateTimeCursor extends PageCursor<OffsetDateTime> {
   }
 
   public static OffsetDateTime parse(String cursor) {
-    if (cursor == null) {
+    if (cursor == null || cursor.isEmpty()) {
       return null;
     }
-    return Instant.ofEpochMilli(Long.parseLong(cursor)).atOffset(ZoneOffset.UTC);
+    return OffsetDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(cursor)), ZoneOffset.UTC);
   }
 }

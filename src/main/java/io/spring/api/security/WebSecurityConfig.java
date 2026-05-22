@@ -1,25 +1,23 @@
 package io.spring.api.security;
 
-import static java.util.Arrays.asList;
-
+import java.util.Arrays;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import reactor.core.publisher.Mono;
 
 @Configuration
-@EnableWebSecurity
+@EnableWebFluxSecurity
 public class WebSecurityConfig {
 
   @Bean
@@ -33,42 +31,44 @@ public class WebSecurityConfig {
   }
 
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.disable())
+  public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    return http.csrf(ServerHttpSecurity.CsrfSpec::disable)
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .exceptionHandling(
-            ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-        .sessionManagement(
-            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authorizeHttpRequests(
+            ex ->
+                ex.authenticationEntryPoint(
+                    (exchange, e) ->
+                        Mono.fromRunnable(
+                            () -> exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED))))
+        .authorizeExchange(
             auth ->
-                auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+                auth.pathMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
-                    .requestMatchers("/graphiql")
+                    .pathMatchers("/graphiql")
                     .permitAll()
-                    .requestMatchers("/graphql")
+                    .pathMatchers("/graphql")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/articles/feed")
+                    .pathMatchers(HttpMethod.GET, "/articles/feed")
                     .authenticated()
-                    .requestMatchers(HttpMethod.POST, "/users", "/users/login")
+                    .pathMatchers(HttpMethod.POST, "/users", "/users/login")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/articles/**", "/profiles/**", "/tags")
+                    .pathMatchers(HttpMethod.GET, "/articles/**", "/profiles/**", "/tags")
                     .permitAll()
-                    .anyRequest()
+                    .anyExchange()
                     .authenticated())
-        .addFilterBefore(jwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
-
-    return http.build();
+        .addFilterBefore(jwtTokenFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+        .build();
   }
 
   @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
-    final CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOrigins(asList("*"));
-    configuration.setAllowedMethods(asList("HEAD", "GET", "POST", "PUT", "DELETE", "PATCH"));
-    configuration.setAllowCredentials(false);
-    configuration.setAllowedHeaders(asList("Authorization", "Cache-Control", "Content-Type"));
-    final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+  CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(Arrays.asList("*"));
+    configuration.setAllowedMethods(
+        Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    configuration.setAllowedHeaders(Arrays.asList("*"));
+    configuration.setExposedHeaders(Arrays.asList("*"));
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
     return source;
   }

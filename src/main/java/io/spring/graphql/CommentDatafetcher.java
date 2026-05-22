@@ -19,7 +19,7 @@ import io.spring.graphql.types.Article;
 import io.spring.graphql.types.Comment;
 import io.spring.graphql.types.CommentEdge;
 import io.spring.graphql.types.CommentsConnection;
-import java.time.ZoneOffset;
+import io.spring.graphql.types.PageInfo;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,10 +29,6 @@ import lombok.AllArgsConstructor;
 @DgsComponent
 @AllArgsConstructor
 public class CommentDatafetcher {
-
-  private static final DateTimeFormatter ISO_FORMATTER =
-      DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneOffset.UTC);
-
   private CommentQueryService commentQueryService;
 
   @DgsData(parentType = COMMENTPAYLOAD.TYPE_NAME, field = COMMENTPAYLOAD.Comment)
@@ -59,7 +55,7 @@ public class CommentDatafetcher {
       DgsDataFetchingEnvironment dfe) {
 
     if (first == null && last == null) {
-      throw new IllegalArgumentException("first 和 last 必须只存在一个");
+      throw new IllegalArgumentException("first and last must have one present");
     }
 
     User current = SecurityUtil.getCurrentUser().orElse(null);
@@ -81,7 +77,7 @@ public class CommentDatafetcher {
               current,
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    io.spring.graphql.types.PageInfo pageInfo = buildCommentPageInfo(comments);
+    PageInfo pageInfo = buildCommentPageInfo(comments);
     CommentsConnection result =
         CommentsConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -102,8 +98,8 @@ public class CommentDatafetcher {
         .build();
   }
 
-  private io.spring.graphql.types.PageInfo buildCommentPageInfo(CursorPager<CommentData> comments) {
-    return io.spring.graphql.types.PageInfo.newBuilder()
+  private PageInfo buildCommentPageInfo(CursorPager<CommentData> comments) {
+    return PageInfo.newBuilder()
         .startCursor(
             comments.getStartCursor() == null ? null : comments.getStartCursor().toString())
         .endCursor(comments.getEndCursor() == null ? null : comments.getEndCursor().toString())
@@ -116,8 +112,8 @@ public class CommentDatafetcher {
     return Comment.newBuilder()
         .id(comment.getId())
         .body(comment.getBody())
-        .updatedAt(ISO_FORMATTER.format(comment.getCreatedAt()))
-        .createdAt(ISO_FORMATTER.format(comment.getCreatedAt()))
+        .updatedAt(comment.getCreatedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+        .createdAt(comment.getCreatedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
         .build();
   }
 }

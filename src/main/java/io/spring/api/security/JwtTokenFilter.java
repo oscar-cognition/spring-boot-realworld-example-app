@@ -2,61 +2,47 @@ package io.spring.api.security;
 
 import io.spring.core.service.JwtService;
 import io.spring.core.user.UserRepository;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
 
-@SuppressWarnings("SpringJavaAutowiringInspection")
-public class JwtTokenFilter extends OncePerRequestFilter {
+public class JwtTokenFilter implements WebFilter {
+
   @Autowired private UserRepository userRepository;
   @Autowired private JwtService jwtService;
-  private final String header = "Authorization";
 
   @Override
-  protected void doFilterInternal(
-      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-      throws ServletException, IOException {
-    getTokenString(request.getHeader(header))
-        .flatMap(token -> jwtService.getSubFromToken(token))
-        .ifPresent(
-            id -> {
-              if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                userRepository
-                    .findById(id)
-                    .ifPresent(
-                        user -> {
-                          UsernamePasswordAuthenticationToken authenticationToken =
-                              new UsernamePasswordAuthenticationToken(
-                                  user, null, Collections.emptyList());
-                          authenticationToken.setDetails(
-                              new WebAuthenticationDetailsSource().buildDetails(request));
-                          SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-                        });
-              }
-            });
-
-    filterChain.doFilter(request, response);
+  public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+    String header = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+    return getTokenString(header)
+        .flatMap(
+            token ->
+                Mono.justOrEmpty(jwtService.getSubFromToken(token))
+                    .flatMap(id -> Mono.justOrEmpty(userRepository.findById(id))))
+        .flatMap(
+            user -> {
+              UsernamePasswordAuthenticationToken auth =
+                  new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList());
+              return chain
+                  .filter(exchange)
+                  .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+            })
+        .switchIfEmpty(chain.filter(exchange));
   }
 
-  private Optional<String> getTokenString(String header) {
-    if (header == null) {
-      return Optional.empty();
-    } else {
+  private Mono<String> getTokenString(String header) {
+    if (header != null) {
       String[] split = header.split(" ");
-      if (split.length < 2) {
-        return Optional.empty();
-      } else {
-        return Optional.ofNullable(split[1]);
+      if (split.length == 2 && split[0].equals("Token")) {
+        return Mono.just(split[1]);
       }
     }
+    return Mono.empty();
   }
 }

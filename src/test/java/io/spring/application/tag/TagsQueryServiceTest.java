@@ -1,25 +1,29 @@
 package io.spring.application.tag;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
+
 import io.spring.application.TagsQueryService;
-import io.spring.core.article.Article;
-import io.spring.core.article.ArticleRepository;
-import io.spring.infrastructure.DbTestBase;
-import io.spring.infrastructure.repository.MyBatisArticleRepository;
-import java.util.Arrays;
-import org.junit.jupiter.api.Assertions;
+import io.spring.infrastructure.readservice.R2dbcTagReadService;
+import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@Import({TagsQueryService.class, MyBatisArticleRepository.class})
-public class TagsQueryServiceTest extends DbTestBase {
-  @Autowired private TagsQueryService tagsQueryService;
+@ExtendWith(MockitoExtension.class)
+public class TagsQueryServiceTest {
 
-  @Autowired private ArticleRepository articleRepository;
+  @Mock private R2dbcTagReadService tagReadService;
+
+  @InjectMocks private TagsQueryService tagsQueryService;
 
   @Test
-  public void should_get_all_tags() {
-    articleRepository.save(new Article("test", "test", "test", Arrays.asList("java"), "123"));
-    Assertions.assertTrue(tagsQueryService.allTags().contains("java"));
+  public void should_return_all_tags() {
+    when(tagReadService.all()).thenReturn(List.of("java", "spring", "react"));
+
+    List<String> tags = tagsQueryService.allTags();
+    assertEquals(3, tags.size());
   }
 }

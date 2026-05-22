@@ -1,49 +1,57 @@
-create table users (
-  id varchar(255) primary key,
-  username varchar(255) UNIQUE,
-  password varchar(255),
-  email varchar(255) UNIQUE,
-  bio text,
-  image varchar(511)
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  bio TEXT DEFAULT '',
+  image TEXT DEFAULT ''
 );
 
-create table articles (
-  id varchar(255) primary key,
-  user_id varchar(255),
-  slug varchar(255) UNIQUE,
-  title varchar(255),
-  description text,
-  body text,
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE articles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  slug TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  body TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-create table article_favorites (
-  article_id varchar(255) not null,
-  user_id varchar(255) not null,
-  primary key(article_id, user_id)
+CREATE INDEX idx_articles_user_id ON articles(user_id);
+CREATE INDEX idx_articles_created_at ON articles(created_at);
+CREATE INDEX idx_articles_updated_at ON articles(updated_at);
+
+CREATE TABLE article_favorites (
+  article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY(article_id, user_id)
 );
 
-create table follows (
-  user_id varchar(255) not null,
-  follow_id varchar(255) not null
+CREATE TABLE follows (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  follow_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY(user_id, follow_id)
 );
 
-create table tags (
-  id varchar(255) primary key,
-  name varchar(255) not null
+CREATE TABLE tags (
+  id TEXT PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL
 );
 
-create table article_tags (
-  article_id varchar(255) not null,
-  tag_id varchar(255) not null
+CREATE TABLE article_tags (
+  article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY(article_id, tag_id)
 );
 
-create table comments (
-  id varchar(255) primary key,
-  body text,
-  article_id varchar(255),
-  user_id varchar(255),
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE comments (
+  id TEXT PRIMARY KEY,
+  body TEXT,
+  article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_comments_article_id ON comments(article_id);

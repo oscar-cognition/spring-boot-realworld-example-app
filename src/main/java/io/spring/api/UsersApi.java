@@ -15,7 +15,6 @@ import io.spring.core.user.UserRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
@@ -26,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 @RestController
 @AllArgsConstructor
@@ -37,32 +37,34 @@ public class UsersApi {
   private UserService userService;
 
   @RequestMapping(path = "/users", method = POST)
-  public ResponseEntity createUser(@Valid @RequestBody RegisterParam registerParam) {
-    User user = userService.createUser(registerParam);
-    UserData userData = userQueryService.findById(user.getId()).get();
-    return ResponseEntity.status(201)
-        .body(userResponse(new UserWithToken(userData, jwtService.toToken(user))));
+  public Mono<ResponseEntity<?>> createUser(@Valid @RequestBody RegisterParam registerParam) {
+    return Mono.fromCallable(
+        () -> {
+          User user = userService.createUser(registerParam);
+          UserData userData = userQueryService.findById(user.getId()).get();
+          return ResponseEntity.status(201)
+              .body(userResponse(new UserWithToken(userData, jwtService.toToken(user))));
+        });
   }
 
   @RequestMapping(path = "/users/login", method = POST)
-  public ResponseEntity userLogin(@Valid @RequestBody LoginParam loginParam) {
-    Optional<User> optional = userRepository.findByEmail(loginParam.getEmail());
-    if (optional.isPresent()
-        && passwordEncoder.matches(loginParam.getPassword(), optional.get().getPassword())) {
-      UserData userData = userQueryService.findById(optional.get().getId()).get();
-      return ResponseEntity.ok(
-          userResponse(new UserWithToken(userData, jwtService.toToken(optional.get()))));
-    } else {
-      throw new InvalidAuthenticationException();
-    }
+  public Mono<ResponseEntity<?>> userLogin(@Valid @RequestBody LoginParam loginParam) {
+    return Mono.fromCallable(
+        () -> {
+          Optional<User> optional = userRepository.findByEmail(loginParam.getEmail());
+          if (optional.isPresent()
+              && passwordEncoder.matches(loginParam.getPassword(), optional.get().getPassword())) {
+            UserData userData = userQueryService.findById(optional.get().getId()).get();
+            return ResponseEntity.ok(
+                userResponse(new UserWithToken(userData, jwtService.toToken(optional.get()))));
+          } else {
+            throw new InvalidAuthenticationException();
+          }
+        });
   }
 
   private Map<String, Object> userResponse(UserWithToken userWithToken) {
-    return new HashMap<String, Object>() {
-      {
-        put("user", userWithToken);
-      }
-    };
+    return Map.of("user", userWithToken);
   }
 }
 

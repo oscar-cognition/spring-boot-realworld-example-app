@@ -11,7 +11,6 @@ import io.spring.core.article.ArticleRepository;
 import io.spring.core.service.AuthorizationService;
 import io.spring.core.user.User;
 import jakarta.validation.Valid;
-import java.util.HashMap;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +22,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping(path = "/articles/{slug}")
@@ -33,56 +33,60 @@ public class ArticleApi {
   private ArticleCommandService articleCommandService;
 
   @GetMapping
-  public ResponseEntity<?> article(
+  public Mono<ResponseEntity<?>> article(
       @PathVariable("slug") String slug, @AuthenticationPrincipal User user) {
-    return articleQueryService
-        .findBySlug(slug, user)
-        .map(articleData -> ResponseEntity.ok(articleResponse(articleData)))
-        .orElseThrow(ResourceNotFoundException::new);
+    return Mono.fromCallable(
+        () ->
+            articleQueryService
+                .findBySlug(slug, user)
+                .map(articleData -> ResponseEntity.ok(articleResponse(articleData)))
+                .orElseThrow(ResourceNotFoundException::new));
   }
 
   @PutMapping
-  public ResponseEntity<?> updateArticle(
+  public Mono<ResponseEntity<?>> updateArticle(
       @PathVariable("slug") String slug,
       @AuthenticationPrincipal User user,
       @Valid @RequestBody UpdateArticleParam updateArticleParam) {
-    return articleRepository
-        .findBySlug(slug)
-        .map(
-            article -> {
-              if (!AuthorizationService.canWriteArticle(user, article)) {
-                throw new NoAuthorizationException();
-              }
-              Article updatedArticle =
-                  articleCommandService.updateArticle(article, updateArticleParam);
-              return ResponseEntity.ok(
-                  articleResponse(
-                      articleQueryService.findBySlug(updatedArticle.getSlug(), user).get()));
-            })
-        .orElseThrow(ResourceNotFoundException::new);
+    return Mono.fromCallable(
+        () ->
+            articleRepository
+                .findBySlug(slug)
+                .map(
+                    article -> {
+                      if (!AuthorizationService.canWriteArticle(user, article)) {
+                        throw new NoAuthorizationException();
+                      }
+                      Article updatedArticle =
+                          articleCommandService.updateArticle(article, updateArticleParam);
+                      return ResponseEntity.ok(
+                          articleResponse(
+                              articleQueryService
+                                  .findBySlug(updatedArticle.getSlug(), user)
+                                  .get()));
+                    })
+                .orElseThrow(ResourceNotFoundException::new));
   }
 
   @DeleteMapping
-  public ResponseEntity deleteArticle(
+  public Mono<ResponseEntity<?>> deleteArticle(
       @PathVariable("slug") String slug, @AuthenticationPrincipal User user) {
-    return articleRepository
-        .findBySlug(slug)
-        .map(
-            article -> {
-              if (!AuthorizationService.canWriteArticle(user, article)) {
-                throw new NoAuthorizationException();
-              }
-              articleRepository.remove(article);
-              return ResponseEntity.noContent().build();
-            })
-        .orElseThrow(ResourceNotFoundException::new);
+    return Mono.fromCallable(
+        () ->
+            articleRepository
+                .findBySlug(slug)
+                .map(
+                    article -> {
+                      if (!AuthorizationService.canWriteArticle(user, article)) {
+                        throw new NoAuthorizationException();
+                      }
+                      articleRepository.remove(article);
+                      return ResponseEntity.noContent().build();
+                    })
+                .orElseThrow(ResourceNotFoundException::new));
   }
 
   private Map<String, Object> articleResponse(ArticleData articleData) {
-    return new HashMap<String, Object>() {
-      {
-        put("article", articleData);
-      }
-    };
+    return Map.of("article", articleData);
   }
 }

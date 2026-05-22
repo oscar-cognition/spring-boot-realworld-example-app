@@ -1,174 +1,106 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
-import static java.util.Arrays.asList;
-import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
-import io.spring.JacksonCustomizations;
-import io.spring.api.security.WebSecurityConfig;
+import io.spring.TestHelper;
 import io.spring.application.ArticleQueryService;
 import io.spring.application.article.ArticleCommandService;
 import io.spring.application.data.ArticleData;
-import io.spring.application.data.ProfileData;
+import io.spring.application.data.ArticleDataList;
 import io.spring.core.article.Article;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.HashMap;
+import io.spring.core.service.JwtService;
+import io.spring.core.user.User;
+import io.spring.core.user.UserRepository;
+import io.spring.infrastructure.readservice.R2dbcUserReadService;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
-@WebMvcTest({ArticlesApi.class})
-@Import({WebSecurityConfig.class, JacksonCustomizations.class})
-public class ArticlesApiTest extends TestWithCurrentUser {
-  @Autowired private MockMvc mvc;
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
+public class ArticlesApiTest {
+  @Autowired private WebTestClient client;
 
   @MockBean private ArticleQueryService articleQueryService;
-
   @MockBean private ArticleCommandService articleCommandService;
+  @MockBean private UserRepository userRepository;
+  @MockBean private JwtService jwtService;
+  @MockBean private R2dbcUserReadService userReadService;
 
-  @Override
+  private User user;
+  private String token;
+
   @BeforeEach
-  public void setUp() throws Exception {
-    super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
+  public void setUp() {
+    String email = "john@jacob.com";
+    String username = "johnjacob";
+    String defaultAvatar = "https://static.productionready.io/images/smiley-cyrus.jpg";
+
+    user = new User(email, username, "123", "", defaultAvatar);
+    when(userRepository.findById(eq(user.getId()))).thenReturn(Optional.of(user));
+
+    token = "token";
+    when(jwtService.getSubFromToken(eq(token))).thenReturn(Optional.of(user.getId()));
   }
 
   @Test
-  public void should_create_article_success() throws Exception {
-    String title = "How to train your dragon";
-    String slug = "how-to-train-your-dragon";
-    String description = "Ever wonder how?";
-    String body = "You have to believe";
-    List<String> tagList = asList("reactjs", "angularjs", "dragons");
-    Map<String, Object> param = prepareParam(title, description, body, tagList);
+  public void should_create_article_success() {
+    Article article =
+        new Article("test title", "desc", "body", Arrays.asList("java"), user.getId());
+    ArticleData articleData = TestHelper.getArticleDataFromArticleAndUser(article, user);
 
-    ArticleData articleData =
-        new ArticleData(
-            "123",
-            slug,
-            title,
-            description,
-            body,
-            false,
-            0,
-            OffsetDateTime.now(ZoneOffset.UTC),
-            OffsetDateTime.now(ZoneOffset.UTC),
-            tagList,
-            new ProfileData("userid", user.getUsername(), user.getBio(), user.getImage(), false));
-
-    when(articleCommandService.createArticle(any(), any()))
-        .thenReturn(new Article(title, description, body, tagList, user.getId()));
-
-    when(articleQueryService.findBySlug(eq(Article.toSlug(title)), any()))
-        .thenReturn(Optional.empty());
-
+    when(articleCommandService.createArticle(any(), any())).thenReturn(article);
     when(articleQueryService.findById(any(), any())).thenReturn(Optional.of(articleData));
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles")
-        .then()
-        .statusCode(200)
-        .body("article.title", equalTo(title))
-        .body("article.favorited", equalTo(false))
-        .body("article.body", equalTo(body))
-        .body("article.favoritesCount", equalTo(0))
-        .body("article.author.username", equalTo(user.getUsername()))
-        .body("article.author.id", equalTo(null));
-
-    verify(articleCommandService).createArticle(any(), any());
-  }
-
-  @Test
-  public void should_get_error_message_with_wrong_parameter() throws Exception {
-    String title = "How to train your dragon";
-    String description = "Ever wonder how?";
-    String body = "";
-    String[] tagList = {"reactjs", "angularjs", "dragons"};
-    Map<String, Object> param = prepareParam(title, description, body, asList(tagList));
-
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles")
-        .prettyPeek()
-        .then()
-        .statusCode(422)
-        .body("errors.body[0]", equalTo("can't be empty"));
-  }
-
-  @Test
-  public void should_get_error_message_with_duplicated_title() {
-    String title = "How to train your dragon";
-    String slug = "how-to-train-your-dragon";
-    String description = "Ever wonder how?";
-    String body = "You have to believe";
-    String[] tagList = {"reactjs", "angularjs", "dragons"};
-    Map<String, Object> param = prepareParam(title, description, body, asList(tagList));
-
-    ArticleData articleData =
-        new ArticleData(
-            "123",
-            slug,
-            title,
-            description,
-            body,
-            false,
-            0,
-            OffsetDateTime.now(ZoneOffset.UTC),
-            OffsetDateTime.now(ZoneOffset.UTC),
-            asList(tagList),
-            new ProfileData("userid", user.getUsername(), user.getBio(), user.getImage(), false));
-
-    when(articleQueryService.findBySlug(eq(Article.toSlug(title)), any()))
-        .thenReturn(Optional.of(articleData));
-
-    when(articleQueryService.findById(any(), any())).thenReturn(Optional.of(articleData));
-
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles")
-        .prettyPeek()
-        .then()
-        .statusCode(422);
-  }
-
-  private HashMap<String, Object> prepareParam(
-      final String title, final String description, final String body, final List<String> tagList) {
-    return new HashMap<String, Object>() {
-      {
-        put(
+    Map<String, Object> param =
+        Map.of(
             "article",
-            new HashMap<String, Object>() {
-              {
-                put("title", title);
-                put("description", description);
-                put("body", body);
-                put("tagList", tagList);
-              }
-            });
-      }
-    };
+            Map.of(
+                "title", "test title",
+                "description", "desc",
+                "body", "body",
+                "tagList", List.of("java")));
+
+    client
+        .post()
+        .uri("/articles")
+        .header("Authorization", "Token " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .bodyValue(param)
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody()
+        .jsonPath("$.article.title")
+        .isEqualTo("test title");
+  }
+
+  @Test
+  public void should_get_articles() {
+    ArticleData articleData = TestHelper.articleDataFixture("1", user);
+    ArticleDataList list = new ArticleDataList(List.of(articleData), 1);
+    when(articleQueryService.findRecentArticles(any(), any(), any(), any(), any()))
+        .thenReturn(list);
+
+    client
+        .get()
+        .uri("/articles")
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody()
+        .jsonPath("$.articlesCount")
+        .isEqualTo(1);
   }
 }

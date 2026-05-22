@@ -5,25 +5,42 @@ import static java.util.stream.Collectors.toList;
 import io.spring.Util;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 @Getter
 @NoArgsConstructor
 @EqualsAndHashCode(of = {"id"})
+@Table("articles")
 public class Article {
+  @Column("user_id")
+  @Setter
   private String userId;
-  private String id;
-  private String slug;
-  private String title;
-  private String description;
-  private String body;
-  private List<Tag> tags;
+
+  @Id @Setter private String id;
+  @Setter private String slug;
+  @Setter private String title;
+  @Setter private String description;
+  @Setter private String body;
+
+  @Transient @Setter private List<Tag> tags = new ArrayList<>();
+
+  @Column("created_at")
+  @Setter
   private OffsetDateTime createdAt;
+
+  @Column("updated_at")
+  @Setter
   private OffsetDateTime updatedAt;
 
   public Article(
@@ -66,6 +83,6 @@ public class Article {
   }
 
   public static String toSlug(String title) {
-    return title.toLowerCase().replaceAll("[\\&|[\\uFE30-\\uFFA0]|\\’|\\”|\\s\\?\\,\\.]+", "-");
+    return title.toLowerCase().replaceAll("[&|\\uFE30-\\uFFA0'\"\\s?,\\.]+", "-");
   }
 }
